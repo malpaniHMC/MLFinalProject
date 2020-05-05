@@ -9,6 +9,23 @@ from sklearn.svm import SVC
 conn = sqlite3.connect('database.sqlite')
 
 def main(): 
+    try:
+        X = pd.read_pickle("data/X_players_score.pkl")
+        y = pd.read_pickle("data/y_players_score.pkl")
+    except:
+        print("error")
+        X,y = getData()
+        
+
+    clf = DecisionTreeClassifier(criterion="entropy", random_state=1234)
+    score= cross_val_score(clf, X.values, y, cv=5)
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=0)
+    # clf = SVC(kernel='linear', class_weight='balanced', max_iter=1e6) 
+    # clf.fit(X_train, y_train)
+    # score = clf.score(X_test, y_test)
+    print(score)
+
+def getData():
     with sqlite3.connect('database.sqlite') as con:
         countries = pd.read_sql_query("SELECT * from Country", con)
         match_data = pd.read_sql("SELECT * from Match", con)
@@ -18,12 +35,7 @@ def main():
         player_attributes = pd.read_sql("SELECT * from Player_Attributes",con)
         sequence = pd.read_sql("SELECT * from sqlite_sequence",con)
         team_attributes = pd.read_sql_query("SELECT * from Team_Attributes",con)
-    # lat_long = pd.read_excel("../input/lat-lon-info-cities/latlong.xlsx",sheetname="Sheet1")
-    # matches = matches.drop(columns=["season","date"])
-
-    # Create X, get team attributes based on match
-    # "country_id", "league_id", "season", "stage", "date", "match_api_id", "home_team_api_id", 
-        # "away_team_api_id", "home_team_goal", "away_team_goal",
+   
     rows = [ "home_player_1", "home_player_2", "home_player_3", "home_player_4", "home_player_5", "home_player_6", "home_player_7", 
         "home_player_8", "home_player_9", "home_player_10", "home_player_11", "away_player_1",
         "away_player_2", "away_player_3", "away_player_4", "away_player_5", "away_player_6",
@@ -33,26 +45,19 @@ def main():
     y= []
     stats= pd.DataFrame()
     (n,d)= match_data.shape
+
     for match in range(n):
         label = get_match_label(match_data.iloc[match])
         if(label!=0):
             y.append(label)
             stats = stats.append(get_fifa_stats(match_data.iloc[match], player_attributes))
+
     X = stats.drop(columns=['match_api_id'])
     y = pd.DataFrame(y)
-    # X= stats
-    print(np.unique(y))
-    print(X.columns)
+
     X.to_pickle("data/X_players_score.pkl")
     y.to_pickle("data/y_players_score.pkl")
-    clf = DecisionTreeClassifier(criterion="entropy", random_state=1234)
-    score= cross_val_score(clf, X.values, y, cv=5)
-    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=0)
-    # clf = SVC(kernel='linear', class_weight='balanced', max_iter=1e6) 
-    # clf.fit(X_train, y_train)
-    # score = clf.score(X_test, y_test)
-    print(score)
-    # print(np.mean(score), np.std(score))
+    return X, y
 
 def get_match_label(match):
     ''' Derives a label for a given match. '''
