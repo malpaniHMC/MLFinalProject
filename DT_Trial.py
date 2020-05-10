@@ -5,6 +5,8 @@ import sklearn
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 conn = sqlite3.connect('database.sqlite')
 
@@ -21,15 +23,21 @@ def main():
     print("y")
     print(np.unique(y.values))
 
-    clf = DecisionTreeClassifier(criterion="entropy", random_state=1234)
-    score= cross_val_score(clf, X.values, y.values, cv=5)
-    print("DT", score)
-
+    steps = [('scaler', StandardScaler()), ('SVC', SVC(kernel='linear', class_weight='balanced', max_iter=1e6))]
+    pipeline = Pipeline(steps)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=0)
-    clf = SVC(kernel='linear', class_weight='balanced', max_iter=1e6) 
-    clf.fit(X_train, y_train)
-    score = clf.score(X_test, y_test)
-    print("SVC", score)
+    pipeline.fit(X_train, y_train)
+    pipeScore = pipeline.score(X_test, y_test)
+    print("pipeline", pipeScore)
+
+    # clf = DecisionTreeClassifier(criterion="entropy", random_state=1234)
+    # score= cross_val_score(clf, X.values, y.values, cv=5)
+    # print("DT", score)
+
+    # clf = SVC(kernel='linear', class_weight='balanced', max_iter=1e6) 
+    # clf.fit(X_train, y_train)
+    # score = clf.score(X_test, y_test)
+    # print("SVC", score)
 
 def getData():
     with sqlite3.connect('database.sqlite') as con:
