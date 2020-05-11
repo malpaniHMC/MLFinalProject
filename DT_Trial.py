@@ -57,6 +57,7 @@ def getData():
         label = get_match_label(match)
         team_stats = get_team_stats(match, team_attributes)
         player_stats = get_fifa_stats(match_data.iloc[match_indx], player_attributes)
+        # print(player_stats)
         # and team_attr.notna().all(axis=None)z
         if(label!=0 and team_stats is not None):
             y.append(label)
@@ -170,6 +171,14 @@ def get_fifa_stats(match, player_stats):
     
     player_stats_new.columns = names        
     player_stats_new['match_api_id'] = match_id
+    player_stats_new["home_defense_team"] = (player_stats_new['home_player_2_overall_rating'] + player_stats_new['home_player_3_overall_rating'] + player_stats_new['home_player_4_overall_rating'])/300
+    player_stats_new["home_mid_team"] = (player_stats_new['home_player_5_overall_rating'] + player_stats_new['home_player_6_overall_rating'] + player_stats_new['home_player_7_overall_rating'] + player_stats_new['home_player_8_overall_rating'])/400
+    player_stats_new["home_attack_team"] = (player_stats_new['home_player_9_overall_rating'] + player_stats_new['home_player_10_overall_rating'] + player_stats_new['home_player_11_overall_rating'])/300
+
+    player_stats_new["away_defense_team"] = (player_stats_new['away_player_2_overall_rating'] + player_stats_new['away_player_3_overall_rating'] + player_stats_new['away_player_4_overall_rating'])/300
+    player_stats_new["away_mid_team"] = (player_stats_new['away_player_5_overall_rating'] + player_stats_new['away_player_6_overall_rating'] + player_stats_new['away_player_7_overall_rating'] + player_stats_new['away_player_8_overall_rating'])/400
+    player_stats_new["away_attack_team"] = (player_stats_new['away_player_9_overall_rating'] + player_stats_new['away_player_10_overall_rating'] + player_stats_new['away_player_11_overall_rating'])/300
+
 
     player_stats_new.reset_index(inplace = True, drop = True)
     
