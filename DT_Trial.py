@@ -7,6 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
 
 conn = sqlite3.connect('database.sqlite')
 
@@ -23,12 +24,19 @@ def main():
     print("y")
     print(np.unique(y.values))
 
-    steps = [('scaler', StandardScaler()), ('SVC', SVC(kernel='linear', class_weight='balanced', max_iter=1e6))]
+    # Bennett
+    # clf = LogisticRegression(random_state=0).fit(X, np.ravel(y))
+    # score = cross_val_score(clf, X.values, np.ravel(y), cv=5)
+
+
+    steps = [('scaler', StandardScaler()), ('LR', LogisticRegression(penalty='none', random_state=0))]
     pipeline = Pipeline(steps)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=0)
     pipeline.fit(X_train, y_train)
     pipeScore = pipeline.score(X_test, y_test)
-    print("pipeline", pipeScore)
+    pipeCV = cross_val_score(pipeline, X.values, np.ravel(y), cv=5)
+    average = pipeCV.mean(0)
+    print("pipeline", average)
 
     # clf = DecisionTreeClassifier(criterion="entropy", random_state=1234)
     # score= cross_val_score(clf, X.values, y.values, cv=5)
