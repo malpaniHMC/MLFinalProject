@@ -17,7 +17,11 @@ def main():
     except:
         print("error")
         X,y = getData()
-        
+    
+    print("X")
+    print(X)
+    print("y")
+    print(np.unique(y.values))
 
     depths = np.arange(2,60,5)
     rf_scores = []
@@ -47,22 +51,40 @@ def getData():
         sequence = pd.read_sql("SELECT * from sqlite_sequence",con)
         team_attributes = pd.read_sql_query("SELECT * from Team_Attributes",con)
    
-    rows = [ "home_player_1", "home_player_2", "home_player_3", "home_player_4", "home_player_5", "home_player_6", "home_player_7", 
+    rows = ["home_player_1", "home_player_2", "home_player_3", "home_player_4", "home_player_5", "home_player_6", "home_player_7", 
         "home_player_8", "home_player_9", "home_player_10", "home_player_11", "away_player_1",
         "away_player_2", "away_player_3", "away_player_4", "away_player_5", "away_player_6",
-        "away_player_7", "away_player_8", "away_player_9", "away_player_10", "away_player_11"]
+        "away_player_7", "away_player_8", "away_player_9", "away_player_10", "away_player_11", "home_team_api_id", "away_team_api_id"]
     match_data.dropna(subset = rows, inplace = True)
 
     y= []
     stats= pd.DataFrame()
     (n,d)= match_data.shape
 
-    for match in range(n):
-        label = get_match_label(match_data.iloc[match])
-        if(label!=0):
+    for match_indx in range(n):
+        match = match_data.iloc[match_indx]
+        label = get_match_label(match)
+        team_stats = get_team_stats(match, team_attributes)
+        player_stats = get_fifa_stats(match_data.iloc[match_indx], player_attributes)
+        # print(player_stats)
+        # and team_attr.notna().all(axis=None)z
+        if(label!=0 and team_stats is not None):
             y.append(label)
-            stats = stats.append(get_fifa_stats(match_data.iloc[match], player_attributes))
-
+            # print("Team Stats:")
+            # print(team_stats.shape)
+            # print(team_stats.head())
+            # print("Player Stats:")
+            # print(player_stats.shape)
+            # print(player_stats.head())
+            toAppend = pd.merge(player_stats, team_stats, how="left")
+            # print("To Append:")
+            # print(toAppend.head())
+            stats= stats.append(toAppend)
+            # print("STATS:")
+            # print(stats.shape)
+            # print(stats.head())
+        
+    
     X = stats.drop(columns=['match_api_id'])
     y = pd.DataFrame(y)
 
@@ -70,16 +92,38 @@ def getData():
     y.to_pickle("data/y_players_score.pkl")
     return X, y
 
+def get_team_stats(match, team_attributes):
+    if(match.home_team_api_id is np.nan or match.away_team_api_id is np.nan): 
+        return None 
+    date = match["date"]
+    team_stats = pd.DataFrame()
+    team_attrs = ['date', 'buildUpPlaySpeed', 'buildUpPlayPassing', 'chanceCreationPassing', 'chanceCreationCrossing', 'chanceCreationShooting', 
+                'defencePressure', 'defenceAggression', 'defenceTeamWidth']   
+    # team_attrs = ['date', 'buildUpPlaySpeed']   
+    
+    home_team_stats = team_attributes[team_attributes.team_api_id == match['home_team_api_id']]
+    home_team_stats = home_team_stats[team_attrs]
+    current_home_team_stats = home_team_stats[home_team_stats.date < date].sort_values(by = 'date', ascending = False)[:1]
+    team_stats = current_home_team_stats[team_attrs].drop(columns=['date']).add_prefix("home_")
+    
+    away_team_stats = team_attributes[team_attributes.team_api_id == match['away_team_api_id']]
+    away_team_stats = away_team_stats[team_attrs]
+    current_away_team_stats = away_team_stats[away_team_stats.date < date].sort_values(by = 'date', ascending = False)[:1]
+    team_stats = pd.concat([team_stats,current_home_team_stats[team_attrs].drop(columns=['date']).add_prefix("away_").reindex()], axis=1)
+    team_stats["match_api_id"]= match.match_api_id
+    if(not team_stats.empty):
+        # print(team_stats)
+        return team_stats 
+    return None
+
+
+# Code based on the work done by Pavan Raj on Kaggle
 def get_match_label(match):
     ''' Derives a label for a given match. '''
     
     #Define variables
     home_goals = match['home_team_goal']
     away_goals = match['away_team_goal']
-     
-    # label = 0
-    # label = pd.DataFrame()
-    # label.loc[0,'match_api_id'] = match['match_api_id'] 
 
     #Identify match label  
     if home_goals > away_goals:
@@ -93,8 +137,8 @@ def get_match_label(match):
         # label.loc[0,'label'] = "Defeat"
 
     return 0        
-    # return label.loc[0]
 
+# Code based on the work done by Pavan Raj on Kaggle
 def get_fifa_stats(match, player_stats):
     ''' Aggregates fifa stats for a given match. '''    
     
@@ -136,6 +180,14 @@ def get_fifa_stats(match, player_stats):
     
     player_stats_new.columns = names        
     player_stats_new['match_api_id'] = match_id
+    player_stats_new["home_defense_team"] = (player_stats_new['home_player_2_overall_rating'] + player_stats_new['home_player_3_overall_rating'] + player_stats_new['home_player_4_overall_rating'])/300
+    player_stats_new["home_mid_team"] = (player_stats_new['home_player_5_overall_rating'] + player_stats_new['home_player_6_overall_rating'] + player_stats_new['home_player_7_overall_rating'] + player_stats_new['home_player_8_overall_rating'])/400
+    player_stats_new["home_attack_team"] = (player_stats_new['home_player_9_overall_rating'] + player_stats_new['home_player_10_overall_rating'] + player_stats_new['home_player_11_overall_rating'])/300
+
+    player_stats_new["away_defense_team"] = (player_stats_new['away_player_2_overall_rating'] + player_stats_new['away_player_3_overall_rating'] + player_stats_new['away_player_4_overall_rating'])/300
+    player_stats_new["away_mid_team"] = (player_stats_new['away_player_5_overall_rating'] + player_stats_new['away_player_6_overall_rating'] + player_stats_new['away_player_7_overall_rating'] + player_stats_new['away_player_8_overall_rating'])/400
+    player_stats_new["away_attack_team"] = (player_stats_new['away_player_9_overall_rating'] + player_stats_new['away_player_10_overall_rating'] + player_stats_new['away_player_11_overall_rating'])/300
+
 
     player_stats_new.reset_index(inplace = True, drop = True)
     
