@@ -6,7 +6,7 @@ import sklearn
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
-from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_validate
+from sklearn.model_selection import StratifiedKFold, GridSearchCV, cross_validate, RepeatedStratifiedKFold
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import StandardScaler
@@ -190,10 +190,10 @@ def get_classifier(clf_str):
         param_grid = {}
     elif clf_str == 'svc':
         clf = SVC(kernel='linear', class_weight='balanced', max_iter=1e6) 
-        param_grid = {'C': np.logspace(-5,5,num=11)}
+        param_grid = {'clf__C': np.logspace(-5,5,num=11)}
     elif clf_str == 'lr':
         clf = LogisticRegression(penalty='l2', max_iter=10000, solver='lbfgs')
-        param_grid = {'C': np.logspace(-5,5,num=11)}
+        param_grid = {'clf__C': np.logspace(-5,5,num=11)}
     elif clf_str == 'ada':
         clf = AdaBoostClassifier(n_estimators=100)
         param_grid = {}
@@ -202,19 +202,28 @@ def get_classifier(clf_str):
 
 #adapted from ps 4
 def get_performance(clf, X,y, numtrials, param_grid):
+    RANDOM_SEED = 42
     train_scores = np.zeros(numtrials)
     test_scores = np.zeros(numtrials)
 
     for i in range(numtrials):
         print(i)
-        inner_cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=i)
-        outer_cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=i)
+        # inner_cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=i)
+        # outer_cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=i)
         
-        newClf = GridSearchCV(estimator=clf, param_grid=param_grid, cv=inner_cv, iid = False)
-        pipe = Pipeline([('scaler', StandardScaler()), ('clf', newClf)])
-        nested_score = cross_validate(pipe, X, y, cv=outer_cv, return_train_score=True)
-        train_scores[i] = np.mean(nested_score['train_score'])
-        test_scores[i] = np.mean(nested_score['test_score'])
+        cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=RANDOM_SEED)
+        
+        pipe = Pipeline([('scaler', StandardScaler()), ('clf', clf)])
+        newClf = GridSearchCV(estimator=pipe, param_grid=param_grid, cv=cv, iid = False, refit=False,
+                          return_train_score=True)
+        newClf.fit(X,y)
+        results = newClf.cv_results_
+        # nested_score = cross_validate(pipe, X, y, cv=outer_cv, return_train_score=True)
+        train = results["mean_train_score"]
+        test = results["mean_test_score"]
+        test_scores[i] = np.max(test)
+        train_scores[i] = train[np.argmax(test)]
+        
     return train_scores, test_scores
 
 #taken from starter code ps4
@@ -269,7 +278,7 @@ def main(args, numtrials):
     y = np.ravel(y)
     train_scores = {}
     test_scores = {}
-    clf_strs = ['dummy','lr', 'svc','rf', 'ada']
+    clf_strs = ['dummy','lr','rf', 'ada']
     for clf_str in clf_strs:
         clf, param_grid = get_classifier(clf_str)
         train, test = get_performance(clf, X, y, numtrials, param_grid)
